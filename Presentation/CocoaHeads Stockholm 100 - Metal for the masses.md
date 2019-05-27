@@ -80,7 +80,7 @@ override func draw(_ rect: CGRect) {
 # Mesh
 ## Triangle
 ## Vertex
-### Point
+### Coordinate
 
 
 ---
@@ -198,7 +198,7 @@ class RealtimeVideoMetalView : MTKView
     private let library : MTLLibrary                    // 3
     private let textureCache : CVMetalTextureCache      // 4
     private var pipelineState : MTLRenderPipelineState! // 5
-    private var vertecBuffer: MTLBuffer                 // 6
+    private var vertexBuffer: MTLBuffer                 // 6
     private var matrixBuffer: MTLBuffer
 
 ```
