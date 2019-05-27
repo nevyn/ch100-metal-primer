@@ -491,7 +491,7 @@ fragment half4 yuvToRgba(
 # [fit] _Thank you_
 ## ❤️
 
-## lookback.io/jobs/
+## lookback.io/jobs
 ## twitter.com/nevyn
 ## _github.com / nevyn / ch100-metal-primer_
 
