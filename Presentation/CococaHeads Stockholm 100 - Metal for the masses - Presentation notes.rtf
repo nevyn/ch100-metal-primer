@@ -1,0 +1,286 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf400
+{\fonttbl\f0\fnil\fcharset0 HelveticaNeue-Bold;\f1\fnil\fcharset0 HelveticaNeue;\f2\fnil\fcharset0 Menlo-Regular;
+\f3\fnil\fcharset0 HelveticaNeue-Italic;}
+{\colortbl;\red255\green255\blue255;\red220\green161\blue13;}
+{\*\expandedcolortbl;;\cssrgb\c89412\c68627\c3922;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
+{\list\listtemplateid2\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid101\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid2}}
+{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10860\viewh21980\viewkind0
+\deftab560
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 CocoaHeads #100: Intro to Metal\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 Presentation notes\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 Hey there! I'm Nevyn Bengtsson. I used to speak quite regularly at Cocoaheads many years ago, maybe even a decade ago, but a lot less regularly after starting my own company. I'm honored and delighted to be invited back again, so thanks Alek for grabbing me!\
+\
+I started out my iOS career writing the first Spotify app for iOS, which got me hired there. Four years after that, I started the company Lookback, where we build a UX research platform, and that's what I'm still working on to this day. We let you basically video-call users in your app, interview them, and do qualitative research to understand your users better, and see with your own eyes\'97and not just numbers\'97what you're doing right and what you're doing wrong in your product.\
+\
+Needless to say, I write a LOT of video and audio code. Last time I was here was at CocoaHeads #87, one year ago, talking about the basics of low level audio and video capture and programming. You can find video, notes and code for that presentation over at:\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+\cf0 \
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+{\field{\*\fldinst{HYPERLINK "https://github.com/nevyn/LBMediaToolkit"}}{\fldrslt \cf2 https://github.com/nevyn/LBMediaToolkit}}\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+I was hoping to do a #2 of that presentation and open source more video tools, but that fell on the wayside... I hope to get around to it though.\
+\
+This time, I want to visit another aspect of graphics: displaying it! In particular, I want to talk about Apple's low level framework for using the graphics card in Apple devices, called Metal. It's generally used mostly by game programmers, but it is used by Apple to display every pixel you see on screen, and for many other tasks. Lucky for you, I don't listen to Metal music, so I'll spare you all the puns and cheap jokes :D\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+\cf0 \
+If you're already a game programmer familiar with graphics programming, you can probably find tons of guides and tutorials online to get started. However, if you're a regular app developer, you might not think Metal is for you.\
+\
+I happen to have studied game programming at Uni before iOS came out and ate my career. So when I encountered an image rendering problem in my iOS app, it was clear to me that Metal could solve my problem with maybe just a hundred lines of code.\
+\
+My goal with this presentation is to give you the basic tools to use Metal in your own app development even if it's a completely 2D app with no game elements. Luckily, if you've always wanted to be a low level game programmer, the technology is still applicable, so if that's what you came here to learn, there should be plenty of material for you too. Bear in mind though... I studied game programming over a decade ago, only do hobby game dev, and have only scratched the surface of Metal. I'm not an expert; I merely want to share the joy of it to non-gamedevs :)\
+\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 With that said, let's start off!\
+\
+Here's my problem. Me and my colleagues are rewriting our iOS app "Participate" from scratch. We've been using Google's WebRTC framework for live streaming video, but are deathly tired of it, so we've built our own protocol for streaming video. \
+\
+However, now I have to implement a view that displays incoming video in realtime. Not only that, but the video isn't even RGB -- it's Y'Cb'Cr, because that's the native video format you use when compressing and decompressing video in the standard H264.\
+\
+As a reminder, I'll bring back a slide from last time I was here to show you RGB pixels, which is the format you almost always use on iOS for display graphics... And Y'Cb'Cr also known as YUV or yuv or a dozen othe rnames, which stores brightness as one chunk of numbers, and then color value as one or two additional chunks of numbers.\
+\
+My first na\'efve approach used VideoToolbox' VTCreateCGImageFromCVPixelBuffer to create a regular old RGB CGImage from a fancy Y'Cb'Cr buffer. I then just draw that onto the screen using CGContext in drawRect. That looks something like this:\
+\
+Easy! Fits in one slide! Thanks, that's it, thanks for having me, it's been great, and ques... oh.\
+\
+[image of CPU usage at 60%]\
+\
+yeahh, so that's just not fast enough. Two streams like that, and even an iPhone X will be on its knees.\
+\
+Why is Metal a good choice for this solution? Because\
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls1\ilvl0
+\f2\fs20 \cf0 {\listtext	\uc0\u8226 	}
+\f1\fs24 Graphics cards (or GPUs) are designed to do a piece of work once per pixel incredibly fast. It's basically running one thread per pixel. Our Y'Cb'Cr conversion will be super fast.\
+\ls1\ilvl0
+\f2\fs20 {\listtext	\uc0\u8226 	}
+\f1\fs24 We will also ask the GPU to display the result; so if we do both computation and display on the GPU, that'll be super fast, with no need to transfer memory or control.\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+So that's a great match. What do we need to know to use it?\
+\
+\pard\pardeftab560\pardirnatural\partightenfactor0
+\ls2\ilvl0
+\f2\fs20 \cf0 {\listtext	\uc0\u8226 	}
+\f1\fs24 Geometry and vertices\
+\ls2\ilvl0
+\f2\fs20 {\listtext	\uc0\u8226 	}
+\f1\fs24 Textures and UV coordinates\
+\ls2\ilvl0
+\f2\fs20 {\listtext	\uc0\u8226 	}
+\f1\fs24 The pipeline: From geometry, through shaders, to screen.\
+\ls2\ilvl0
+\f2\fs20 {\listtext	\uc0\u8226 	}
+\f1\fs24 How to draw using Metal\
+\ls2\ilvl0
+\f2\fs20 {\listtext	\uc0\u8226 	}
+\f1\fs24 Basic understanding of Shaders\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 \
+Then we can get to code. Let's get to it.\
+\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 Geometry\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Geometry describes the 3d shape of objects. Everything you see in a 3D game scene is composed of triangles. A collection of triangles is often called a "mesh". It's possible for some sorts of 3D graphics to use other primitives, but almost everything is triangles. If it doesn't look like triangles, that's because there's a lot of them, and/or it's cheating and using shaders to make hard edges look round.\
+\
+Each triangle in the mesh is composed of three points, called vertices. Each vertex has an x, y and z position in space. Let's zoom in on this house and see what that means. Here are three triangles, and the five vertices they share, A B C D and E. We can make one triangle with A, B and C, another with B, C and D, and a third with C, D and E. Since triangles are usually edge-to-edge like this and share vertices, we can represent such geometry using a 
+\f3\i triangle strip
+\f1\i0 . In a triangle strip data structure, three vertices represent a triangle. If you add a fourth vertex, it uses the last three to form yet another triangle. And with the fifth vertex, we use the three last vertices to form a third triangle. So instead of having nine vertices (three per triangle), we just need five. Clever!\
+\
+Let's set it up in code. I'm just going to show the incoming video stream as a square, so I only need 2D, which means two points per vertex. Let's make a square, which in game programmer terms is called a "quad". It has four vertices, one for each corner, forming two triangles.\
+\
+(7min 35s)\
+\
+A vertex can have so much more than just a coordinate, though. It can have color, lighting properties, and information on how to apply an image (aka "texture") to it. Textures are still regular ol flat images, but 3d geometry has volume and irregular shapes, so how do you fit one onto the other? Well, using UV mapping.\
+\
+UV mapping is a little like origami -- each vertex maps to a coordinate in a flat image. Because x, y and z are already used for spatial coordinates, u and v are used as variables to denote the vertical and horizontal location of a pixel in a texture. Each vertex is assigned a u and a v coordinate that should be mapped to the location. Thus the name "UV mapping".\
+\
+You can map UV coordinates any way you want, for example to have higher resolution on a surface which the user will focus on, but this flag shape is the most common way ot map a cube. 0,0 is top left, and 1 1 is bottom right.\
+\
+In our case, we're just mapping the four corners of a square to be the corners of the texture. Let's extend our previous struct to get that information in. Each vertex now has an x and y for its location on screen, and a u and a v for where that location maps to in its texture.\
+\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 Pipeline\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Alright! That's the input data we need. Let's dig into the pipeline of how this data is transformed into actual screen pixels.\
+\
+Your code is split into three parts. In the red box on the left, your Swift code runs on the CPU. It figures out the business or game logic, and based on that, mashes the correct geometry, variables and texture into the GPU.\
+\
+Over on the GPU, you receive this data in code called "shaders". These are also your code, but written in the Metal shader language, and they operate on a lower level. I'll get back to exactly how they work. For now, know that the vertex shader takes your geometry and variables, and spits out geometry ready to be displayed on-screen. The rasterizer together with the fragment shader takes this geometry and produces pixels. In a simple pipeline, these pixels go directly to the screen. And that's it! All the way from app to screen, through a few boxes.\
+\
+Now that we have a rough understanding of the pipeline, let's look at what it looks like in Swift, before we get into talking about shaders.\
+\
+(10min 32s)\
+\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 Configuring pipeline\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Metal is accompanied by MetalKit, which makes it comparatively easy to start using Metal, no matter what the architecture your app is. It fits well into UIKit apps using setNeedsDisplay, and it also fits well into game engines like Unity. It's got it all.\
+\
+In my app, I want my Metal code to live self-contained in a view, so that the rest of the app doesn't have to know or understand it apart from the simple public API. For me then, the easiest approach is to just subclass MTKView. If you're writing an actual game or engine, you would probably put the Metal code in a controller/manager, and inject relevant parts into an MTKView.\
+\
+So, let's set up. My public API just take these nebulous Y'Cb'Cr pixels from somewhere else in the app, together with settings on how to show them.\
+\
+My view will want to keep track of a device, a command queue, a library, a texture cache a pipeline state, and some buffers. These are the high level things you'll want to know what they are. Let's break it down.\
+\
+The device is just your graphics card. On iOS, there's just the main default one, it's all you got. On MacOS you can have multiple graphics cards, so there you have to be a bit more careful.\
+\
+Next up is the command queue. The CPU and the GPU are two different chips running completely separately in the same computer, so they'll have to communicate, kind of like two computers on a wired network except insanely much faster. When you run Metal code to ask the GPU to do things, it queues messages up to be sent over this internal network.\
+\
+Related to it is the command buffer and render encoder. The render encoder is the API you'll call to perform drawing, but it doesn't actually go out and draw the things for it. Rather, it serializes your commands and puts them in a command buffer, which is then sent over to the queue, which then sends it over to the graphics card as soon as it can.\
+\
+The Library is where your shaders are stored. The texture cache is where your textures are stored. Buffer is just memory allocated on the GPU, for stuff like vertices, matrices and so on. Yeah.\
+\
+Finally, the pipeline state is the class that setups and tracks the state of your GPU. Think of it as your AVCaptureSession, or AVAudioSession.\
+\
+If this seems complex, trust me, it's like you have no idea how easy and simple this is. This API is so simple, concise and precise. It maps perfectly to what happens in the real world, while still providing plenty of room for you to say, "Apple, go ahead and optimize everything insanely well for me behind the scenes while I write no code at all". Compared to OpenGL where the modern API is layered on top of a decade old API with a bad idea of how modern graphics cards work, which in turn is layered on top of a two decades old API which is even worse, this is heaven.\
+\
+Now that that's in place, let's see the constructor. We create all of these classes in turn. Device, command queue, and library are straightforward. For the buffers, we have a constant number of vertices and a single transformation matrix we'll be using, so we can use a single static allocation each.\
+\
+Moving on, we configure the GPU by creating a pipeline state for it. You create a descriptor to describe the pipeline state you want, and Metal will set the GPU up for you correspondingly. In this case, I want my two shaders, I want Metal to output MTKView-compatible color pixels, and I want the background to be transparent. That's it!\
+\
+(15min 37s)\
+\
+\pard\pardeftab560\sa40\partightenfactor0
+
+\f0\b\fs28 \cf0 Drawing\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Now that everything is peachy, we can start drawing frames using 
+\f0\b drawRect
+\f1\b0 . That's right, the same drawRect you're used to from UIKit. The code I've shown so far sets it up so drawRect is called every time per screen refresh, which usually means 60 frames per second. You can also tell MTKView to use the standard "dirty rect" system that UIKit uses, so that it only redraws this view if you say setNeedsDisplay.\
+\
+First we'll want two textures, one for the luma plane of our video pixels (which is the brightness value of each pixel, remember?), and one for the chroma plane (which is the color of the pixels). Luckilly, CoreVideo contains functions for converting CVPixelBuffers over to Metal textures, so we just use that. If you set everything up just right, that means your video is decoded from h264 on the GPU, and then immediately transfered over to Metal also on the GPU, without ever having to touch the CPU. That saves a lot of bandwidth.\
+\
+\pard\pardeftab560\sa40\partightenfactor0
+
+\f0\b\fs28 \cf0 Interlude: Matrices\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Then, we have the matrices. Okay I'm sorry, but here comes the math. It kills me, but it's also wonderful and amazing. Linear algebra is like the only math from school I truly appreciate. I'll just run through the bare necessities:\
+\
+If you multiply a point by a matrix, you get a point back that's been transformed by the matrix, thus the name "transformation matrix". For example, a rotation matrix will rotate points coming into it. If you have a point at x 100 y 0, then rotate by 90 degrees, you now have a point at x 0 and y 100.\
+\
+If you multiply a matrix by a matrix, you get a new matrix that performs both operations! First the right hand one, then the left hand one: note that the order is reverse of what you would guess.\
+\
+You can also inverse a matrix to get its inverse transform. A translation to the right will become a translation to the left.\
+\
+Then finally, here's an actually useful transformation. Reading right to left, it first translates to the middle of a box, rotates around that center, and then translates back so that we can keep performing other operations. The result is a single matrix that perform rotations around a center. So great!\
+\
+\pard\pardeftab560\sa40\partightenfactor0
+
+\f0\b\fs28 \cf0 Interlude: Coordinate spaces\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+The next interlude I have to talk about is coordinate spaces. You already know about coordinate spaces: you use them every day when you manage frames of views in your UIKit app. The white circle has a frame origin of x50, y100 in its purple superview, but if transformed to the yellow superview or to the window, it has coordinates x150 y200.\
+\
+Games has the same concept: One matrix is used to represent the camera location, and each object in the world has a matrix used to represent its location. By multiplying camera, with model, with vertex location, you can go from model space, to world space, to camera space\
+\
+Okay, so back to drawRect. I spent way too much brain power figuring out how to do rotation with aspect fitting, so I'm including that code in this slide for your future relief, not for us to go through right now. The only line I really want to emphasise here is that if you're working with you, you'll probably want to work in a coordinate space where one pixel on screen is one unit in your math. \
+\
+By default x 0 y 0 is top left, and x 1 y 1 is bottom right, which is not a coordinate space that's easy to fix aspect ratios in. So I recommend a simple inverse scale transform by the size of the view to get a sane coordinate space.\
+\
+Then you can see that here I create a model matrix -- which is what I call the matrix that represents the transform of my one single quad in my scene -- representing the different display settings and aspect fitting that I've got.\
+\
+And finally, the transform that I forward to my shader is camera times model, which lets us go all the way from vertex to screen space.\
+\
+Then we just move this matrix over to the GPU. I also move over the quad itself to the GPU here.\
+\
+\pard\pardeftab560\sa40\partightenfactor0
+
+\f0\b\fs28 \cf0 Drawing\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Finally, at long last, after years of toiling, we get to draw to the screen. We create a command buffer, which is like a database transaction. A render encoder is used to mash render commands into that transaction.\
+\
+We encode commands to use our fresh vertices and matrices, and tell Metal which indices to use for them. We encode commands to use our new pretty textures, also providing indices. These indices need to exactly match the indices used in your shaders.\
+\
+Finally, we encode a command for drawing our one single quad as a triangle strip of four vertices.\
+\
+Aand then commit and present this to the GPU.\
+\
+We're done!! That's all the code! ...\
+\
+on the CPU. \
+\
+We still have those pesky shaders on the GPU to write.\
+\
+\
+\pard\pardeftab560\partightenfactor0
+
+\f0\b\fs34 \cf0 Shaders\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+So let's figure out these shader things. Shaders are massively parallel pieces of code written in custom languages that run on the GPU. The GPU creates what is basically millions of threads for you, and runs your function once on each thread. It sounds complicated, but the effect is that you write a tiny function that does a single thing, so it's actually pretty straightforward.\
+\
+Let's go back to that pipeline diagram. The first shader is the vertex shader. You write a function in the Metal shader language, and it's supposed to take your geometry and variables and output geometry in screen space, ready to be displayed on the user's screen.\
+\
+Alright, so let's write your that shader file. It looks a bit like C++. \
+\
+First, we declare the Vertex structure. It matches the one we had in swift, with x and y positions, and u and v texcoords.\
+\
+Then we define a struct called Varyings, which becomes the OUTPUT from the vertex shader, and thus then INPUT to the fragment shader.\
+\
+Finally, we have a struct called Uniforms which are basically globals. In this case, that's the camera transform matrix we mashed in from Swift as a buffer variable before.\
+\
+Alright, so let's make that vertex shader. We define a C-like function called modelTransform, that outputs Varyings. It inputs vertices and says "these vertices will come in device buffer 0", as seen on that previous slide. Our transformation matrix in Uniforms will come in device buffer 1. And finally, the shader automatically gets an index for the vertex we're currently shading.\
+\
+The implementation is simple. Set the output position to be the incoming vertex position, converted to a proper 4-array of floats, transformed by the camera transform from our globals. And just forward our texture coordinate as is over to the fragment shader.\
+\
+Note that we write this function to handle just a single vertex. The GPU will conceptually schedule four threads in parallel for our four vertices, making the execution instant. If we were writing a game with millions of vertices, it'd still work the same, with millions of threads.\
+\
+Okay, finally we get to the fragment shader, the place where we can do our y'cb'cr conversion, the one line of code in this whole presentation that actually does what we were trying to do all along.\
+\
+So we define our yuvToRgba function as a C-like function that returns an rgba value (that's what half4 means, roughly). It takes the Varyings as outputted from the fragment shader before. And it takes the two textures from before -- the luma (or Y) texture, and the chroma (or UV) texture.\
+\
+A sampler is constructed, which is a class that looks up pixels in a texture. Since pixels almost never match one-to-one between screen and texture, we need a sampler to do either upsampling or downsampling. We use the sampler to fetch the y and uv values. And finally, oh finally, we do the math necessary to convert Y'Cb'Cr to RGB, and return the output color as it should be displayed on-screen.\
+\
+Again, this function is written to deal with a SINGLE PIXEL. Millions of these will be scheduled to be executed conceptually in parallel. A powerful GPU can have hundreds of cores, coloring hundreds of pixels at the same time.\
+\
+And there you have it. Does it work?\
+\
+\pard\pardeftab560\sa40\partightenfactor0
+
+\f0\b\fs28 \cf0 Demo\
+\pard\pardeftab560\slleading20\partightenfactor0
+
+\f1\b0\fs24 \cf0 \
+Ohh yeah it does. Are you ready for a demo? After all that? Sure you are!\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+\cf0 \
+\
+\pard\pardeftab560\slleading20\partightenfactor0
+\cf0 If this is the sort of thing you enjoy learning while working, we're looking for an iOS developer. Check it out on our web site.\
+\
+Thank you!\
+\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
+\cf0 \
+}

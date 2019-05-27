@@ -59,6 +59,14 @@ override func draw(_ rect: CGRect) {
 
 ---
 
+# Geometry
+# Textures
+# Pipeline
+# Metal drawing
+# Shaders
+
+---
+
 # [fit] _Geometry_
 
 ![original fit](house.png)
@@ -123,6 +131,12 @@ override func draw(_ rect: CGRect) {
 ```
 
 ![fit right](quad-verts.png)
+
+---
+
+# [fit] _Textures_
+
+![](uv.png)
 
 ---
 
@@ -466,7 +480,7 @@ fragment half4 yuvToRgba(
 
 ---
 
-# [fit] _DEMO_
+# [fit] _DEMO?_
 
 ---
 
@@ -477,5 +491,7 @@ fragment half4 yuvToRgba(
 # [fit] _Thank you_
 ## ❤️
 
+## lookback.io/jobs/
 ## twitter.com/nevyn
+## _github.com / nevyn / ch100-metal-primer_
 
